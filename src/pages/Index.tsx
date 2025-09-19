@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { VideoFeed } from "@/components/dashboard/VideoFeed";
 import { TacticalMap } from "@/components/dashboard/TacticalMap";
@@ -5,6 +7,7 @@ import { AlertSystem } from "@/components/dashboard/AlertSystem";
 import { SOSPanel } from "@/components/dashboard/SOSPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Shield,
   Eye,
@@ -12,9 +15,33 @@ import {
   AlertTriangle,
   Users,
   Activity,
+  LogOut,
+  User,
 } from "lucide-react";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check if user is authenticated (in real app, check token/session)
+    const authStatus = localStorage.getItem('authenticated');
+    if (!authStatus) {
+      navigate('/login');
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authenticated');
+    navigate('/login');
+  };
+
+  if (!isAuthenticated) {
+    return null; // Will redirect to login
+  }
+
   return (
     <DashboardLayout>
       {/* Mission Status Banner */}
@@ -29,12 +56,29 @@ const Index = () => {
               AI-Powered Defense & Border Management System
             </p>
           </div>
-          <div className="text-right">
-            <Badge variant="destructive" className="mb-2 animate-pulse">
-              ALERT CONDITION: BRAVO
-            </Badge>
-            <div className="text-sm text-muted-foreground">
-              Sector: Northern Border | Grid: 25°N 75°E
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <Badge variant="destructive" className="mb-2 animate-pulse">
+                ALERT CONDITION: BRAVO
+              </Badge>
+              <div className="text-sm text-muted-foreground">
+                Sector: Northern Border | Grid: 25°N 75°E
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                Admin
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
@@ -98,12 +142,14 @@ const Index = () => {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <VideoFeed
               feedId="CAM-007"
-              title="Sector B-12 Perimeter"
+              title="Sector B-12 Perimeter (Night Vision)"
               location="Border Fence North"
               status="live"
               threatLevel="critical"
               detectedObjects={["Person", "Rifle"]}
               cameraIndex={0}
+              enableObjectDetection={true}
+              enableNightVision={true}
             />
             <VideoFeed
               feedId="CAM-003"
@@ -113,6 +159,7 @@ const Index = () => {
               threatLevel="medium"
               detectedObjects={["Vehicle", "Person"]}
               cameraIndex={1}
+              enableObjectDetection={true}
             />
             <VideoFeed
               feedId="CAM-012"
@@ -122,6 +169,7 @@ const Index = () => {
               threatLevel="low"
               detectedObjects={[]}
               cameraIndex={2}
+              enableObjectDetection={true}
             />
             <VideoFeed
               feedId="CAM-018"
