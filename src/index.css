@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* RAKSH KAVACH - Military Defense System Design Tokens */
+
+@layer base {
+  :root {
+    /* Core Military Dark Theme */
+    --background: 220 13% 7%;
+    --foreground: 0 0% 95%;
+
+    /* Command Center Interface */
+    --card: 220 13% 9%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 13% 11%;
+    --popover-foreground: 0 0% 95%;
+
+    /* Tactical Primary - Military Blue */
+    --primary: 210 85% 45%;
+    --primary-foreground: 0 0% 98%;
+
+    /* Secondary - Steel Gray */
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 0 0% 85%;
+
+    /* Muted - Tactical Gray */
+    --muted: 220 13% 13%;
+    --muted-foreground: 220 9% 55%;
+
+    /* Accent - Tactical Highlight */
+    --accent: 220 13% 18%;
+    --accent-foreground: 0 0% 90%;
+
+    /* Critical Alert System */
+    --destructive: 0 85% 65%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Tactical Borders */
+    --border: 220 13% 20%;
+    --input: 220 13% 15%;
+    --ring: 210 85% 45%;
+
+    --radius: 0.375rem;
+
+    /* Mission-Critical Alert Colors */
+    --alert-critical: 0 85% 65%;
+    --alert-warning: 45 95% 60%;
+    --alert-info: 210 85% 45%;
+    --alert-success: 120 60% 50%;
+
+    /* Tactical Status Colors */
+    --status-active: 120 60% 50%;
+    --status-standby: 45 95% 60%;
+    --status-offline: 220 9% 55%;
+    --status-critical: 0 85% 65%;
+
+    /* Surveillance Grid */
+    --grid-primary: 220 13% 20%;
+    --grid-secondary: 220 13% 25%;
+
+    /* Tactical Gradients */
+    --gradient-command: linear-gradient(
+      135deg,
+      hsl(220 13% 9%),
+      hsl(220 13% 11%)
+    );
+    --gradient-alert: linear-gradient(
+      135deg,
+      hsl(0 85% 65% / 0.1),
+      hsl(0 85% 65% / 0.05)
+    );
+    --gradient-tactical: linear-gradient(
+      135deg,
+      hsl(210 85% 45% / 0.1),
+      hsl(210 85% 45% / 0.05)
+    );
+
+    /* Tactical Shadows */
+    --shadow-command: 0 4px 20px hsl(220 13% 5% / 0.3);
+    --shadow-alert: 0 0 20px hsl(0 85% 65% / 0.2);
+    --shadow-tactical: 0 0 20px hsl(210 85% 45% / 0.1);
+
+    /* Sidebar Variables */
+    --sidebar-background: 220 13% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 210 85% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 13% 12%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 220 13% 18%;
+    --sidebar-ring: 210 85% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Grid pattern for tactical overlays */
+  .bg-grid-pattern {
+    background-image: linear-gradient(
+        hsl(var(--grid-primary)) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, hsl(var(--grid-primary)) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Tactical animations */
+  @keyframes pulse-tactical {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  .animate-pulse-tactical {
+    animation: pulse-tactical 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Command center focus styles */
+  .focus\:ring-tactical:focus {
+    box-shadow: 0 0 0 2px hsl(var(--primary));
+  }
+
+  /* Scrollbar styling for command interface */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--accent-foreground));
+  }
+}
