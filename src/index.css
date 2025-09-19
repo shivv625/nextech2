@@ -153,4 +153,58 @@
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--accent-foreground));
   }
+
+  /* Custom map icons */
+  .custom-soldier-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .custom-threat-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  /* Leaflet map styling */
+  .leaflet-container {
+    background: #1a1a1a !important;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: hsl(var(--card)) !important;
+    color: hsl(var(--card-foreground)) !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 4px 20px hsl(220 13% 5% / 0.3) !important;
+  }
+
+  .leaflet-popup-tip {
+    background: hsl(var(--card)) !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Map popup styling */
+  .leaflet-popup-content-wrapper {
+    background: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 20px hsl(220 13% 5% / 0.3);
+  }
+
+  .leaflet-popup-tip {
+    background: hsl(var(--card));
+  }
+
+  .soldier-popup .leaflet-popup-content {
+    margin: 0;
+    padding: 0;
+  }
+
+  .threat-popup .leaflet-popup-content {
+    margin: 0;
+    padding: 0;
+  }
 }
