@@ -24,7 +24,7 @@ import {
   Plane,
 } from "lucide-react";
 import { useCamera } from "@/hooks/use-camera";
-import { useYoloDetection } from "@/hooks/use-yolo-detection";
+import { useYoloDetectionReal } from "@/hooks/use-yolo-detection-real";
 import { useAlerts } from "@/hooks/use-alerts";
 import { config, isFeatureEnabled } from "@/config/environment";
 
@@ -77,7 +77,7 @@ export function VideoFeed({
     startDetection,
     stopDetection,
     isModelLoaded,
-  } = useYoloDetection(videoRef);
+  } = useYoloDetectionReal(videoRef, feedId);
 
   const { addAlert } = useAlerts();
 

@@ -9,7 +9,13 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "setup": "node scripts/setup-env.js"
+    "setup": "node scripts/setup-env.js",
+    "start:backend": "cd backend && python yolo_detection.py",
+    "start:backend:win": "cd backend && start_backend.bat",
+    "start:backend:unix": "cd backend && ./start_backend.sh",
+    "start:all": "concurrently \"npm run dev\" \"npm run start:backend\"",
+    "start:all:win": "concurrently \"npm run dev\" \"npm run start:backend:win\"",
+    "start:all:unix": "concurrently \"npm run dev\" \"npm run start:backend:unix\""
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.10",
@@ -78,6 +84,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
