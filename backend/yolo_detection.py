@@ -24,18 +24,19 @@ app = Flask(__name__)
 CORS(app)
 
 class YOLODetector:
-    def __init__(self, model_path: str = "yolo/yolov8n.pt"):
+    def __init__(self, model_path: str = "../yolo/runs/detect/detect3_resume2/weights/best.pt"):
         """Initialize YOLO detector with the trained model"""
         self.model_path = model_path
         self.model = None
         self.load_model()
         
-        # Detection classes we're interested in
+        # Detection classes we're interested in - updated for custom trained model
         self.target_classes = {
             'person': 0,
             'car': 2, 'truck': 7, 'bus': 5, 'motorcycle': 3, 'bicycle': 1,
-            'airplane': 4,  # Will be mapped to 'drone'
-            'knife': 43, 'scissors': 76, 'gun': 28, 'pistol': 28
+            'airplane': 4, 'aeroplane': 4,  # Will be mapped to 'drone'
+            'knife': 43, 'scissors': 76, 'gun': 28, 'pistol': 28,
+            'weapon': 28, 'rifle': 28, 'firearm': 28
         }
         
         # Class mapping for our application
@@ -43,18 +44,33 @@ class YOLODetector:
             'person': 'person',
             'car': 'vehicle', 'truck': 'vehicle', 'bus': 'vehicle', 
             'motorcycle': 'vehicle', 'bicycle': 'vehicle',
-            'airplane': 'drone',  # Map airplane to drone
-            'knife': 'weapon', 'scissors': 'weapon', 'gun': 'weapon', 'pistol': 'weapon'
+            'airplane': 'drone', 'aeroplane': 'drone',  # Map airplane to drone
+            'knife': 'weapon', 'scissors': 'weapon', 'gun': 'weapon', 
+            'pistol': 'weapon', 'weapon': 'weapon', 'rifle': 'weapon', 'firearm': 'weapon'
         }
     
     def load_model(self):
         """Load the YOLO model"""
         try:
-            self.model = YOLO(self.model_path)
-            logger.info(f"YOLO model loaded successfully from {self.model_path}")
+            # Try to load custom trained model first
+            if os.path.exists(self.model_path):
+                self.model = YOLO(self.model_path)
+                logger.info(f"Custom trained YOLO model loaded successfully from {self.model_path}")
+            else:
+                # Fallback to default model
+                logger.warning(f"Custom model not found at {self.model_path}, using default yolov8n.pt")
+                self.model = YOLO("yolov8n.pt")
+                logger.info("Default YOLO model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
-            raise e
+            # Try one more fallback
+            try:
+                logger.info("Attempting to load default yolov8n.pt model...")
+                self.model = YOLO("yolov8n.pt")
+                logger.info("Default YOLO model loaded as fallback")
+            except Exception as fallback_error:
+                logger.error(f"Fallback model loading also failed: {fallback_error}")
+                raise fallback_error
     
     def preprocess_image(self, image_data: str) -> np.ndarray:
         """Convert base64 image data to OpenCV format"""
@@ -95,7 +111,7 @@ class YOLODetector:
                         class_name = self.model.names[cls_id]
                         
                         # Map to our application classes
-                        mapped_class = self.class_mapping.get(class_name, 'unknown')
+                        mapped_class = self.class_mapping.get(class_name.lower(), 'unknown')
                         
                         # Only include target classes
                         if mapped_class in ['person', 'vehicle', 'drone', 'weapon']:
@@ -184,8 +200,28 @@ class YOLODetector:
             logger.error(f"Error drawing detections: {e}")
             return image
 
-# Initialize YOLO detector
-detector = YOLODetector()
+# Initialize YOLO detector with custom model path
+import os
+
+# Try to find the custom trained model
+custom_model_paths = [
+    "custom_model.pt",  # Copied by setup script
+    "../yolo/runs/detect/detect3_resume2/weights/best.pt",
+    "yolo/runs/detect/detect3_resume2/weights/best.pt",
+    "../yolo/best.pt",
+    "yolo/best.pt"
+]
+
+model_path = "yolov8n.pt"  # Default fallback
+for path in custom_model_paths:
+    if os.path.exists(path):
+        model_path = path
+        logger.info(f"Found custom model at: {path}")
+        break
+else:
+    logger.info("Using default YOLOv8 model")
+
+detector = YOLODetector(model_path)
 
 @app.route('/health', methods=['GET'])
 def health_check():

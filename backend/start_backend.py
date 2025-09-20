@@ -39,13 +39,27 @@ def install_dependencies():
 
 def check_yolo_model():
     """Check if YOLO model file exists"""
-    model_path = "yolo/yolov8n.pt"
-    if os.path.exists(model_path):
-        logger.info(f"YOLO model found at {model_path}")
+    # Look for custom trained model first
+    custom_model_paths = [
+        "../yolo/runs/detect/detect3_resume2/weights/best.pt",
+        "yolo/runs/detect/detect3_resume2/weights/best.pt",
+        "../yolo/best.pt",
+        "yolo/best.pt"
+    ]
+    
+    for model_path in custom_model_paths:
+        if os.path.exists(model_path):
+            logger.info(f"Custom trained YOLO model found at {model_path}")
+            return True
+    
+    # Check for default model
+    default_model_path = "yolov8n.pt"
+    if os.path.exists(default_model_path):
+        logger.info(f"Default YOLO model found at {default_model_path}")
         return True
     else:
-        logger.error(f"YOLO model not found at {model_path}")
-        return False
+        logger.warning(f"No YOLO model found. Will attempt to download default model.")
+        return True  # YOLOv8 will download automatically if not found
 
 def start_server():
     """Start the Flask server"""
@@ -68,8 +82,7 @@ def main():
     
     # Check YOLO model
     if not check_yolo_model():
-        logger.error("YOLO model not found. Please ensure yolov8n.pt is in the yolo/ directory")
-        sys.exit(1)
+        logger.warning("Custom YOLO model not found, but will proceed with default model")
     
     # Check dependencies
     if not check_dependencies():

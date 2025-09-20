@@ -120,7 +120,7 @@ export function useYoloDetectionReal(
           },
           body: JSON.stringify({
             image: imageData,
-            confidence: 0.5,
+            confidence: 0.4, // Lowered threshold for better detection
             camera_id: cameraId,
           }),
         }
@@ -147,11 +147,23 @@ export function useYoloDetectionReal(
 
         setDetectionResult(result);
         setError(null);
+
+        // Log detection results for debugging
+        if (result.objects.length > 0) {
+          console.log(`${cameraId} detected:`, {
+            total: result.objects.length,
+            persons: result.counts.persons,
+            vehicles: result.counts.vehicles,
+            drones: result.counts.drones,
+            weapons: result.counts.weapons,
+            threats: result.threats.length,
+          });
+        }
       } else {
         throw new Error(data.error || "Detection failed");
       }
     } catch (err) {
-      console.error("YOLO detection error:", err);
+      console.error(`YOLO detection error for ${cameraId}:`, err);
       setError(err instanceof Error ? err.message : "Detection failed");
     }
   }, [videoRef, isDetecting, isModelLoaded, cameraId, captureFrame]);
@@ -194,4 +206,3 @@ export function useYoloDetectionReal(
     isModelLoaded,
   };
 }
-

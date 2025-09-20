@@ -25,17 +25,17 @@ const Index = () => {
 
   useEffect(() => {
     // Check if user is authenticated (in real app, check token/session)
-    const authStatus = localStorage.getItem('authenticated');
+    const authStatus = localStorage.getItem("authenticated");
     if (!authStatus) {
-      navigate('/login');
+      navigate("/login");
     } else {
       setIsAuthenticated(true);
     }
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('authenticated');
-    navigate('/login');
+    localStorage.removeItem("authenticated");
+    navigate("/login");
   };
 
   if (!isAuthenticated) {
@@ -178,7 +178,8 @@ const Index = () => {
               status="live"
               threatLevel="low"
               detectedObjects={["Vehicle"]}
-              cameraIndex={0}
+              cameraIndex={3}
+              enableObjectDetection={true}
             />
           </div>
 

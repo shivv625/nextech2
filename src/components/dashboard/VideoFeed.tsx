@@ -91,17 +91,23 @@ export function VideoFeed({
   // Auto-select camera based on cameraIndex
   useEffect(() => {
     if (devices.length > 0 && cameraIndex < devices.length) {
-      switchCamera(devices[cameraIndex].deviceId);
+      const targetDevice = devices[cameraIndex];
+      if (targetDevice && targetDevice.deviceId !== currentDeviceId) {
+        console.log(
+          `Switching to camera ${cameraIndex}: ${targetDevice.label}`
+        );
+        switchCamera(targetDevice.deviceId);
+      }
     }
-  }, [devices, cameraIndex, switchCamera]);
+  }, [devices, cameraIndex, switchCamera, currentDeviceId]);
 
   // Start/stop object detection based on enableObjectDetection
   useEffect(() => {
     if (enableObjectDetection && isStreaming && isModelLoaded) {
-      console.log("Starting YOLO v8 object detection...");
+      console.log(`Starting YOLO v8 object detection for ${feedId}...`);
       startDetection();
     } else {
-      console.log("Stopping object detection...");
+      console.log(`Stopping object detection for ${feedId}...`);
       stopDetection();
     }
   }, [
@@ -110,14 +116,15 @@ export function VideoFeed({
     isModelLoaded,
     startDetection,
     stopDetection,
+    feedId,
   ]);
 
   // Debug detection result
   useEffect(() => {
     if (detectionResult) {
-      console.log("Detection result:", detectionResult);
+      console.log(`Detection result for ${feedId}:`, detectionResult);
     }
-  }, [detectionResult]);
+  }, [detectionResult, feedId]);
 
   // Auto-generate SOS alerts for threats
   useEffect(() => {
@@ -145,7 +152,7 @@ export function VideoFeed({
           } Detected`,
           description: `AI detected ${threat.type} with ${Math.round(
             threat.confidence * 100
-          )}% confidence`,
+          )}% confidence on ${title}`,
           location: location,
           status: "active",
           source: `Camera Feed ${feedId}`,
@@ -154,7 +161,7 @@ export function VideoFeed({
         });
       });
     }
-  }, [detectionResult?.threats, addAlert, location, feedId]);
+  }, [detectionResult?.threats, addAlert, location, feedId, title]);
 
   // Night vision effect
   const applyNightVision = useCallback(() => {
@@ -306,15 +313,15 @@ export function VideoFeed({
                     const getObjectColor = (type: string) => {
                       switch (type) {
                         case "person":
-                          return "#ef4444";
+                          return "#ef4444"; // Red for person
                         case "vehicle":
-                          return "#3b82f6";
+                          return "#3b82f6"; // Blue for vehicle
                         case "drone":
-                          return "#f59e0b";
+                          return "#f59e0b"; // Orange for drone
                         case "weapon":
-                          return "#dc2626";
+                          return "#dc2626"; // Dark red for weapon
                         default:
-                          return "#6b7280";
+                          return "#6b7280"; // Gray for unknown
                       }
                     };
 
@@ -325,7 +332,7 @@ export function VideoFeed({
                         case "vehicle":
                           return "🚗";
                         case "drone":
-                          return "✈️";
+                          return "🛸";
                         case "weapon":
                           return "🔫";
                         default:
@@ -333,15 +340,20 @@ export function VideoFeed({
                       }
                     };
 
+                    // Calculate relative position based on video dimensions
+                    const videoElement = videoRef.current;
+                    const videoWidth = videoElement?.videoWidth || 640;
+                    const videoHeight = videoElement?.videoHeight || 480;
+
                     return (
                       <div
                         key={obj.id}
                         className="absolute"
                         style={{
-                          left: `${(obj.bbox.x / 640) * 100}%`,
-                          top: `${(obj.bbox.y / 480) * 100}%`,
-                          width: `${(obj.bbox.width / 640) * 100}%`,
-                          height: `${(obj.bbox.height / 480) * 100}%`,
+                          left: `${(obj.bbox.x / videoWidth) * 100}%`,
+                          top: `${(obj.bbox.y / videoHeight) * 100}%`,
+                          width: `${(obj.bbox.width / videoWidth) * 100}%`,
+                          height: `${(obj.bbox.height / videoHeight) * 100}%`,
                         }}
                       >
                         {/* Detection box */}
@@ -445,7 +457,7 @@ export function VideoFeed({
 
           {/* Object detection status */}
           {enableObjectDetection && (
-            <div className="absolute top-2 left-2 flex items-center gap-2">
+            <div className="absolute top-2 left-2 flex flex-col gap-1">
               {!isModelLoaded ? (
                 <Badge variant="outline" className="text-xs bg-blue-600">
                   <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
@@ -458,15 +470,27 @@ export function VideoFeed({
                     className="text-xs flex items-center gap-1"
                   >
                     <Eye className="w-3 h-3" />
-                    YOLO v8 {isDetecting ? "ON" : "OFF"}
+                    YOLO v8 {isDetecting ? "ACTIVE" : "OFF"}
                   </Badge>
                   {detectionResult && (
-                    <Badge variant="outline" className="text-xs">
-                      {detectionResult.counts.persons}P{" "}
+                    <Badge variant="outline" className="text-xs bg-black/70">
+                      Objects: {detectionResult.counts.persons}P{" "}
                       {detectionResult.counts.vehicles}V{" "}
-                      {detectionResult.counts.drones}D
+                      {detectionResult.counts.drones}D{" "}
+                      {detectionResult.counts.weapons}W
                     </Badge>
                   )}
+                  {detectionResult?.threats &&
+                    detectionResult.threats.length > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="text-xs animate-pulse"
+                      >
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        {detectionResult.threats.length} THREAT
+                        {detectionResult.threats.length > 1 ? "S" : ""}
+                      </Badge>
+                    )}
                   {!detectionResult && isDetecting && (
                     <Badge variant="outline" className="text-xs bg-yellow-600">
                       Detecting...
