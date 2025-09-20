@@ -9,19 +9,22 @@ import numpy as np
 import base64
 import json
 from ultralytics import YOLO
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import threading
 import time
 from typing import Dict, List, Tuple, Optional
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 class YOLODetector:
     def __init__(self, model_path: str = "../yolo/runs/detect/detect3_resume2/weights/best.pt"):
@@ -54,22 +57,26 @@ class YOLODetector:
         try:
             # Try to load custom trained model first
             if os.path.exists(self.model_path):
+                logger.info(f"Loading custom YOLO model from: {self.model_path}")
                 self.model = YOLO(self.model_path)
-                logger.info(f"Custom trained YOLO model loaded successfully from {self.model_path}")
+                logger.info(f"✅ Custom trained YOLO model loaded successfully from {self.model_path}")
+                logger.info(f"Model classes: {list(self.model.names.values())}")
             else:
                 # Fallback to default model
                 logger.warning(f"Custom model not found at {self.model_path}, using default yolov8n.pt")
                 self.model = YOLO("yolov8n.pt")
-                logger.info("Default YOLO model loaded successfully")
+                logger.info("✅ Default YOLO model loaded successfully")
+                logger.info(f"Model classes: {list(self.model.names.values())}")
         except Exception as e:
-            logger.error(f"Failed to load YOLO model: {e}")
+            logger.error(f"❌ Failed to load YOLO model: {e}")
             # Try one more fallback
             try:
                 logger.info("Attempting to load default yolov8n.pt model...")
                 self.model = YOLO("yolov8n.pt")
-                logger.info("Default YOLO model loaded as fallback")
+                logger.info("✅ Default YOLO model loaded as fallback")
+                logger.info(f"Model classes: {list(self.model.names.values())}")
             except Exception as fallback_error:
-                logger.error(f"Fallback model loading also failed: {fallback_error}")
+                logger.error(f"❌ Fallback model loading also failed: {fallback_error}")
                 raise fallback_error
     
     def preprocess_image(self, image_data: str) -> np.ndarray:
@@ -110,30 +117,29 @@ class YOLODetector:
                         # Get class name
                         class_name = self.model.names[cls_id]
                         
-                        # Map to our application classes
+                        # Map to our application classes for coloring/threat logic
                         mapped_class = self.class_mapping.get(class_name.lower(), 'unknown')
-                        
-                        # Only include target classes
-                        if mapped_class in ['person', 'vehicle', 'drone', 'weapon']:
-                            # Get bounding box coordinates
-                            xyxy = box.xyxy[0].tolist()
-                            x1, y1, x2, y2 = map(int, xyxy)
-                            
-                            detection = {
-                                'id': f"{mapped_class}_{int(time.time() * 1000)}_{len(detections)}",
-                                'type': mapped_class,
-                                'confidence': confidence,
-                                'bbox': {
-                                    'x': x1,
-                                    'y': y1,
-                                    'width': x2 - x1,
-                                    'height': y2 - y1
-                                },
-                                'timestamp': time.time(),
-                                'original_class': class_name
-                            }
-                            
-                            detections.append(detection)
+
+                        # Always include detection so frontend can show original label
+                        # (e.g., 'cell phone') even if it's not in our mapped target set
+                        xyxy = box.xyxy[0].tolist()
+                        x1, y1, x2, y2 = map(int, xyxy)
+
+                        detection = {
+                            'id': f"{mapped_class}_{int(time.time() * 1000)}_{len(detections)}",
+                            'type': mapped_class,
+                            'confidence': confidence,
+                            'bbox': {
+                                'x': x1,
+                                'y': y1,
+                                'width': x2 - x1,
+                                'height': y2 - y1
+                            },
+                            'timestamp': time.time(),
+                            'original_class': class_name
+                        }
+
+                        detections.append(detection)
             
             return detections
             
@@ -223,14 +229,69 @@ else:
 
 detector = YOLODetector(model_path)
 
+# Socket.IO event handlers
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    logger.info('Client connected to Socket.IO')
+    emit('status', {'message': 'Connected to YOLO Detection Server', 'model_loaded': detector.model is not None})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    logger.info('Client disconnected from Socket.IO')
+
+@socketio.on('start_detection')
+def handle_start_detection(data):
+    """Handle start detection request"""
+    camera_id = data.get('camera_id', 'unknown')
+    logger.info(f'Starting detection for camera {camera_id}')
+    emit('detection_status', {'camera_id': camera_id, 'status': 'started'})
+
+@socketio.on('stop_detection')
+def handle_stop_detection(data):
+    """Handle stop detection request"""
+    camera_id = data.get('camera_id', 'unknown')
+    logger.info(f'Stopping detection for camera {camera_id}')
+    emit('detection_status', {'camera_id': camera_id, 'status': 'stopped'})
+
+@app.route('/')
+def serve_frontend():
+    """Serve the React frontend"""
+    return send_from_directory(app.static_folder, 'index.html')
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({
+    model_loaded = detector.model is not None
+    model_info = {}
+    
+    if model_loaded:
+        try:
+            model_info = {
+                'model_path': detector.model_path,
+                'model_classes': list(detector.model.names.values()) if hasattr(detector.model, 'names') else [],
+                'class_mapping': detector.class_mapping
+            }
+        except Exception as e:
+            logger.error(f"Error getting model info: {e}")
+            model_info['error'] = str(e)
+    
+    response = {
         'status': 'healthy',
-        'model_loaded': detector.model is not None,
-        'timestamp': time.time()
-    })
+        'model_loaded': model_loaded,
+        'model_info': model_info,
+        'timestamp': time.time(),
+        'api_endpoints': [
+            '/health',
+            '/detect',
+            '/detect_with_visualization',
+            '/model_info'
+        ]
+    }
+    
+    logger.info(f"📊 Health check - Model loaded: {model_loaded}")
+    return jsonify(response)
 
 @app.route('/detect', methods=['POST'])
 def detect_objects():
@@ -272,6 +333,24 @@ def detect_objects():
             'timestamp': time.time(),
             'total_detections': len(detections)
         }
+        
+        # Emit real-time detection data via Socket.IO
+        socketio.emit('detection_update', {
+            'camera_id': camera_id,
+            'detections': detections,
+            'counts': counts,
+            'threats': threats,
+            'timestamp': time.time()
+        })
+        
+        # Emit threat alerts if any
+        if threats:
+            socketio.emit('threat_alert', {
+                'camera_id': camera_id,
+                'threats': threats,
+                'location': data.get('location', 'Unknown'),
+                'timestamp': time.time()
+            })
         
         logger.info(f"Detection completed for camera {camera_id}: {counts}")
         return jsonify(response)
@@ -356,6 +435,6 @@ def model_info():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    logger.info("Starting YOLO Detection API Server...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    logger.info("Starting YOLO Detection API Server with Socket.IO...")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 

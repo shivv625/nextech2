@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCamera } from "@/hooks/use-camera";
 import { useYoloDetectionReal } from "@/hooks/use-yolo-detection-real";
+import { useSocketIO } from "@/hooks/use-socketio";
 import { useAlerts } from "@/hooks/use-alerts";
 import { config, isFeatureEnabled } from "@/config/environment";
 
@@ -81,10 +82,29 @@ export function VideoFeed({
 
   const { addAlert } = useAlerts();
 
+  // Socket.IO integration for real-time updates
+  const {
+    isConnected: socketConnected,
+    detectionEvents,
+    threatAlerts,
+    startDetection: socketStartDetection,
+    stopDetection: socketStopDetection,
+  } = useSocketIO();
+
   // Set up video element when stream changes
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      const vid = videoRef.current;
+      const onLoadedMetadata = async () => {
+        try {
+          await vid.play();
+          console.log(`[VideoFeed:${feedId}] Video metadata loaded. Size: ${vid.videoWidth}x${vid.videoHeight}`);
+        } catch (e) {
+          console.warn(`[VideoFeed:${feedId}] Video play() failed`, e);
+        }
+      };
+      vid.onloadedmetadata = onLoadedMetadata;
     }
   }, [stream]);
 
@@ -119,12 +139,57 @@ export function VideoFeed({
     feedId,
   ]);
 
-  // Debug detection result
+  // Handle real-time Socket.IO detection events
   useEffect(() => {
-    if (detectionResult) {
-      console.log(`Detection result for ${feedId}:`, detectionResult);
+    if (detectionEvents.length > 0) {
+      const latestEvent = detectionEvents.find(
+        (event) => event.camera_id === feedId
+      );
+      if (latestEvent) {
+        console.log(`Real-time detection update for ${feedId}:`, latestEvent);
+        // Update local detection result with Socket.IO data
+        // This provides real-time updates even without active polling
+      }
     }
-  }, [detectionResult, feedId]);
+  }, [detectionEvents, feedId]);
+
+  // Handle real-time threat alerts
+  useEffect(() => {
+    if (threatAlerts.length > 0) {
+      const latestAlert = threatAlerts.find(
+        (alert) => alert.camera_id === feedId
+      );
+      if (latestAlert) {
+        console.log(`Threat alert for ${feedId}:`, latestAlert);
+
+        // Generate alert for each threat
+        latestAlert.threats.forEach((threat) => {
+          addAlert({
+            type:
+              threat.type === "weapon"
+                ? "weapon"
+                : threat.type === "person"
+                ? "intrusion"
+                : "system",
+            severity: threat.type === "weapon" ? "critical" : "high",
+            title: `${
+              threat.type.charAt(0).toUpperCase() + threat.type.slice(1)
+            } Detected (Real-time)`,
+            description: `Socket.IO: AI detected ${
+              threat.type
+            } with ${Math.round(
+              threat.confidence * 100
+            )}% confidence on ${title}`,
+            location: location,
+            status: "active",
+            source: `Socket.IO - Camera ${feedId}`,
+            cameraId: feedId,
+            objectCount: 1,
+          });
+        });
+      }
+    }
+  }, [threatAlerts, feedId, addAlert, title, location]);
 
   // Auto-generate SOS alerts for threats
   useEffect(() => {
@@ -267,7 +332,7 @@ export function VideoFeed({
           {/* Live camera feed */}
           {isStreaming && stream ? (
             <div className="relative w-full h-full">
-              {/* Regular video feed */}
+              {/* Regular live video feed (always shown unless night vision canvas is enabled) */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -278,7 +343,7 @@ export function VideoFeed({
                 }`}
               />
 
-              {/* Night vision canvas overlay */}
+              {/* Night vision canvas overlay (disabled when using backend visualization) */}
               {nightVisionEnabled && (
                 <canvas
                   ref={canvasRef}
@@ -290,9 +355,9 @@ export function VideoFeed({
                 />
               )}
 
-              {/* Object detection overlays */}
+              {/* Object detection overlays drawn over live video */}
               {enableObjectDetection && (
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none z-10">
                   {/* Model loading indicator */}
                   {!isModelLoaded && (
                     <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center gap-2">
@@ -306,6 +371,14 @@ export function VideoFeed({
                     <div className="absolute top-4 left-4 bg-yellow-600 text-white px-3 py-2 rounded text-sm flex items-center gap-2">
                       <Eye className="w-4 h-4" />
                       YOLO v8 Detection Starting...
+                    </div>
+                  )}
+
+                  {/* Detection error display */}
+                  {detectionError && (
+                    <div className="absolute top-12 left-4 bg-red-600 text-white px-3 py-2 rounded text-sm flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Detection Error: {detectionError}
                     </div>
                   )}
 
@@ -358,27 +431,28 @@ export function VideoFeed({
                       >
                         {/* Detection box */}
                         <div
-                          className="absolute inset-0 border-2 rounded-lg animate-pulse"
+                          className="absolute inset-0 border-2 md:border-[3px] rounded-sm"
                           style={{
                             borderColor: getObjectColor(obj.type),
                             boxShadow: `0 0 10px ${getObjectColor(obj.type)}50`,
                           }}
                         />
 
-                        {/* Detection label */}
+                        {/* Detection label (YOLO-style) */}
                         <div
-                          className="absolute -top-8 left-0 bg-black/90 text-white text-xs px-2 py-1 rounded flex items-center gap-1 font-bold"
+                          className="absolute -top-7 left-0 text-black text-[10px] md:text-xs px-2 py-1 rounded-sm flex items-center gap-1 font-bold"
                           style={{
+                            backgroundColor: getObjectColor(obj.type),
+                            color: '#111827',
                             border: `1px solid ${getObjectColor(obj.type)}`,
                             boxShadow: `0 0 5px ${getObjectColor(obj.type)}50`,
                           }}
                         >
-                          <span className="text-lg">
-                            {getObjectIcon(obj.type)}
+                          <span className="uppercase">
+                            {(obj.original_class || obj.type).replace(/_/g, ' ')}
                           </span>
-                          <span className="uppercase">{obj.type}</span>
-                          <span className="text-yellow-400">
-                            ({Math.round(obj.confidence * 100)}%)
+                          <span className="ml-1">
+                            {` ${(obj.confidence * 100).toFixed(0)}%`}
                           </span>
                         </div>
 
@@ -402,6 +476,20 @@ export function VideoFeed({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Debug: Show detection attempts */}
+              {isDetecting && isModelLoaded && (
+                <div className="absolute bottom-4 left-4 bg-green-600/80 text-white px-2 py-1 rounded text-xs">
+                  🎯 Detecting... (every 500ms)
+                </div>
+              )}
+
+              {/* Debug: Show detection results count */}
+              {detectionResult && (
+                <div className="absolute bottom-8 left-4 bg-blue-600/80 text-white px-2 py-1 rounded text-xs">
+                  📊 Total: {detectionResult.objects?.length || 0} objects
                 </div>
               )}
             </div>
@@ -498,6 +586,18 @@ export function VideoFeed({
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* Socket.IO connection status */}
+          {socketConnected && (
+            <div className="absolute top-2 right-2">
+              <Badge
+                variant="outline"
+                className="text-xs bg-green-600 text-white"
+              >
+                🔗 Socket.IO
+              </Badge>
             </div>
           )}
 

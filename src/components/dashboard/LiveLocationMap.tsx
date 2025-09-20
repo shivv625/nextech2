@@ -46,7 +46,7 @@ interface LiveLocationMapProps {
 const AIIMS_BHUBANESWAR = {
   lat: 20.2961,
   lng: 85.8245,
-  name: "AIIMS Bhubaneswar",
+  name: "NMIET",
   address: "Sijua, Patrapada, Bhubaneswar, Odisha 751019, India",
 };
 

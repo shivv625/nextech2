@@ -61,20 +61,36 @@ export function useYoloDetectionReal(
   useEffect(() => {
     const checkBackendHealth = async () => {
       try {
+        console.log("🔍 Checking backend health at:", `${API_BASE_URL}/health`);
         const response = await fetch(`${API_BASE_URL}/health`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
+        console.log("✅ Backend health response:", data);
+
         setIsModelLoaded(data.model_loaded);
         if (!data.model_loaded) {
           setError("YOLO model not loaded on backend");
+          console.error("❌ YOLO model not loaded on backend");
+        } else {
+          console.log("✅ YOLO model is loaded and ready");
+          setError(null);
         }
       } catch (err) {
-        console.error("Backend health check failed:", err);
-        setError("Backend server not available");
+        console.error("❌ Backend health check failed:", err);
+        setError(`Backend server not available: ${err}`);
         setIsModelLoaded(false);
       }
     };
 
+    // Check immediately and then every 5 seconds
     checkBackendHealth();
+    const interval = setInterval(checkBackendHealth, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Convert video frame to base64
@@ -105,14 +121,24 @@ export function useYoloDetectionReal(
 
   // Perform YOLO detection
   const detectObjects = useCallback(async () => {
-    if (!videoRef.current || !isDetecting || !isModelLoaded) return;
+    if (!videoRef.current || !isDetecting || !isModelLoaded) {
+      if (!videoRef.current) console.log("⚠️ No video element for", cameraId);
+      if (!isDetecting) console.log("⚠️ Detection not active for", cameraId);
+      if (!isModelLoaded) console.log("⚠️ Model not loaded for", cameraId);
+      return;
+    }
 
     try {
       const imageData = captureFrame();
-      if (!imageData) return;
+      if (!imageData) {
+        console.log("⚠️ Failed to capture frame for", cameraId);
+        return;
+      }
+
+      console.log(`📸 Sending detection request for ${cameraId}...`);
 
       const response = await fetch(
-        `${API_BASE_URL}/detect_with_visualization`,
+        `${API_BASE_URL}/detect`,
         {
           method: "POST",
           headers: {
@@ -120,17 +146,20 @@ export function useYoloDetectionReal(
           },
           body: JSON.stringify({
             image: imageData,
-            confidence: 0.4, // Lowered threshold for better detection
+            confidence: 0.3, // Lowered threshold for better detection
             camera_id: cameraId,
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          `HTTP error! status: ${response.status} - ${response.statusText}`
+        );
       }
 
       const data = await response.json();
+      console.log(`📊 Detection response (/detect) for ${cameraId}:`, data);
 
       if (data.success) {
         const result: ObjectDetectionResult = {
@@ -142,7 +171,7 @@ export function useYoloDetectionReal(
             weapons: 0,
           },
           threats: data.threats || [],
-          image_with_detections: data.image_with_detections,
+          image_with_detections: undefined,
         };
 
         setDetectionResult(result);
@@ -150,20 +179,25 @@ export function useYoloDetectionReal(
 
         // Log detection results for debugging
         if (result.objects.length > 0) {
-          console.log(`${cameraId} detected:`, {
+          console.log(`🎯 ${cameraId} detected:`, {
             total: result.objects.length,
             persons: result.counts.persons,
             vehicles: result.counts.vehicles,
             drones: result.counts.drones,
             weapons: result.counts.weapons,
             threats: result.threats.length,
+            objects: result.objects.map(
+              (obj) => `${obj.type}(${Math.round(obj.confidence * 100)}%)`
+            ),
           });
+        } else {
+          console.log(`🔍 ${cameraId}: No objects detected`);
         }
       } else {
         throw new Error(data.error || "Detection failed");
       }
     } catch (err) {
-      console.error(`YOLO detection error for ${cameraId}:`, err);
+      console.error(`❌ YOLO detection error for ${cameraId}:`, err);
       setError(err instanceof Error ? err.message : "Detection failed");
     }
   }, [videoRef, isDetecting, isModelLoaded, cameraId, captureFrame]);
@@ -176,7 +210,7 @@ export function useYoloDetectionReal(
     setError(null);
 
     // Start detection every 500ms for real-time detection
-    detectionIntervalRef.current = setInterval(detectObjects, 500);
+    detectionIntervalRef.current = setInterval(detectObjects, 300);
   }, [isDetecting, isModelLoaded, detectObjects, cameraId]);
 
   const stopDetection = useCallback(() => {
